@@ -3,27 +3,27 @@
 #include <cstring>
 #include <sstream>
 
-constexpr int INDEX_BIT_COUNT = 14;
-constexpr int LENGTH_BIT_COUNT = 6;
+constexpr int INDEX_BIT_COUNT = 12;
+constexpr int LENGTH_BIT_COUNT = 4;
 constexpr int WINDOW_SIZE = (1 << INDEX_BIT_COUNT);
 constexpr int LOOK_AHEAD_SIZE = (1 << LENGTH_BIT_COUNT);
 constexpr int BYTE = 8;
 constexpr int TREE_ROOT = WINDOW_SIZE;
-constexpr int UNUSED = 0;
+constexpr int UNUSED = -1;
 constexpr int END_OF_STREAM = 0;
 
 #define MOD_WINDOW(value) ((value) & (WINDOW_SIZE - 1))
 
-unsigned char window[WINDOW_SIZE];
-	
+std::vector<unsigned char> window(WINDOW_SIZE);
+
 
 struct Tree {
-	int parent;
-	int largerChild;
-	int smallerChild;
+	int parent{ UNUSED };
+	int largerChild{ UNUSED };
+	int smallerChild{ UNUSED };
 };
 
-Tree tree[WINDOW_SIZE + 1];
+std::vector<Tree> tree(WINDOW_SIZE + 1);
 
 void contractNode(int oldNode, int newNode) {
 	tree[newNode].parent = tree[oldNode].parent;
@@ -102,10 +102,11 @@ void addString(int stringPosition) {
 			testNode = *child;
 		}
 	}
-	
+
 }
 
 int getMatchLength(int currentPosition, int* matchPosition) {
+	*matchPosition = 0;
 	int i{ 0 }, testNode{ 0 }, delta{ 0 }, matchLength{ 0 }, * child{ nullptr };
 	testNode = tree[TREE_ROOT].largerChild;
 	for (;;) {
@@ -115,7 +116,7 @@ int getMatchLength(int currentPosition, int* matchPosition) {
 			if (delta != 0)
 				break;
 		}
-		if (i >= matchLength) {
+		if (i > matchLength) {
 			matchLength = i;
 			*matchPosition = testNode;
 		}
@@ -142,11 +143,10 @@ void compressFile(std::fstream& input, std::unique_ptr<stl::BitFile>& output) {
 		window[currentPosition + i] = (unsigned char)c;
 	}
 	lookAheadBytes = i;
-	//initializeTree(currentPosition);
 	while (lookAheadBytes > 0) {
 		if (matchLength >= lookAheadBytes && lookAheadBytes == LOOK_AHEAD_SIZE)
 			matchLength = lookAheadBytes - 1;
-		if (matchLength <= 1) {
+		if (matchLength < 2) {
 			matchLength = 1;
 			stl::outputBit(output, 0);
 			stl::outputBits(output, (std::uint32_t)window[currentPosition], BYTE);
@@ -184,7 +184,6 @@ void expandFile(std::unique_ptr<stl::BitFile>& input, std::fstream& output) {
 			output.put(c);
 			window[currentPosition] = (unsigned char)c;
 			currentPosition = MOD_WINDOW(currentPosition + 1);
-			
 		}
 		else {
 			matchPosition = (int)stl::inputBits(input, INDEX_BIT_COUNT);

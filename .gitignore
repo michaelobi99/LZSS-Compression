@@ -6,4 +6,8 @@
 *.zip
 *.mp3
 x64
-/caglary corpus
+/caglarycorpus
+/enwik9
+*.exe
+*.rar
+*.cz

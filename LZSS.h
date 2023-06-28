@@ -3,19 +3,17 @@
 #include <cstring>
 #include <sstream>
 
-constexpr int INDEX_BIT_COUNT = 12;
-constexpr int LENGTH_BIT_COUNT = 4;
+constexpr int INDEX_BIT_COUNT = 12; //search buffer
+constexpr int LENGTH_BIT_COUNT = 4; //look ahead buffer
 constexpr int WINDOW_SIZE = (1 << INDEX_BIT_COUNT);
 constexpr int LOOK_AHEAD_SIZE = (1 << LENGTH_BIT_COUNT);
 constexpr int BYTE = 8;
 constexpr int TREE_ROOT = WINDOW_SIZE;
 constexpr int UNUSED = -1;
 constexpr int END_OF_STREAM = 0;
+constexpr int BREAK_EVEN = (1 + INDEX_BIT_COUNT + LENGTH_BIT_COUNT) / (1 + BYTE);
 
 #define MOD_WINDOW(value) ((value) & (WINDOW_SIZE - 1))
-
-std::vector<unsigned char> window(WINDOW_SIZE);
-
 
 struct Tree {
 	int parent{ UNUSED };
@@ -23,6 +21,7 @@ struct Tree {
 	int smallerChild{ UNUSED };
 };
 
+std::vector<unsigned char> window(WINDOW_SIZE);
 std::vector<Tree> tree(WINDOW_SIZE + 1);
 
 void contractNode(int oldNode, int newNode) {
@@ -102,7 +101,6 @@ void addString(int stringPosition) {
 			testNode = *child;
 		}
 	}
-
 }
 
 int getMatchLength(int currentPosition, int* matchPosition) {
@@ -110,11 +108,9 @@ int getMatchLength(int currentPosition, int* matchPosition) {
 	int i{ 0 }, testNode{ 0 }, delta{ 0 }, matchLength{ 0 }, * child{ nullptr };
 	testNode = tree[TREE_ROOT].largerChild;
 	for (;;) {
-		//std::cout << "testNode = " << testNode << "\n";
-		for (i = 0; i < LOOK_AHEAD_SIZE; ++i) {
+		for (i = 0; i < LOOK_AHEAD_SIZE; i++) {
 			delta = window[MOD_WINDOW(currentPosition + i)] - window[MOD_WINDOW(testNode + i)];
-			if (delta != 0)
-				break;
+			if (delta != 0)break;
 		}
 		if (i > matchLength) {
 			matchLength = i;
@@ -144,9 +140,9 @@ void compressFile(std::fstream& input, std::unique_ptr<stl::BitFile>& output) {
 	}
 	lookAheadBytes = i;
 	while (lookAheadBytes > 0) {
-		if (matchLength >= lookAheadBytes && lookAheadBytes == LOOK_AHEAD_SIZE)
+		if (matchLength >= lookAheadBytes)
 			matchLength = lookAheadBytes - 1;
-		if (matchLength < 2) {
+		if (matchLength <= BREAK_EVEN) {
 			matchLength = 1;
 			stl::outputBit(output, 0);
 			stl::outputBits(output, (std::uint32_t)window[currentPosition], BYTE);
